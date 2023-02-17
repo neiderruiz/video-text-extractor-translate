@@ -1,3 +1,10 @@
 /build
 /env
 /models
+/modules/__pycache__
+/sounds/*.mp3
+/sounds/*.vtt
+/sounds/*.mp4
+/*.mp3
+/*.vtt
+/*.mp4
