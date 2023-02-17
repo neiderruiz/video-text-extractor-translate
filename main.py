@@ -126,7 +126,8 @@ label_list_result = Label(root, textvariable=list_result)
 label_current_line = Label(root, textvariable=current_line)
 
 #entry text video youtube
-ytInput = Entry(root, width=30, textvariable=yt_url)
+ytInput = Entry(root, width=30, textvariable=yt_url,fg='grey',show='')
+ytInput.insert(0, "add url video Yt")
 
 
 label_languages = Label(root, text="Seleccionar Idiomas:")
