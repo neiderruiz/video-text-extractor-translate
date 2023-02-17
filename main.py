@@ -1,3 +1,4 @@
+import modules.fix_translate
 from tkinter import *
 from tkinter import filedialog
 from moviepy.video.io.VideoFileClip import VideoFileClip
@@ -10,18 +11,9 @@ import re
 from tkinter import messagebox
 import winsound
 import datetime
+from modules.declarations import languages, models, FOLDER_SOUNDS
 
 
-FOLDER_SOUNDS = "./sounds/"
-
-idiomas = [
-    ('es', 'español'),
-    ('en', 'inglés'),
-    ('pt', 'portugués'),
-    ('ar', 'árabe'),
-    ('zh', 'chino'),
-    ('hi', 'hindi')
-]
 
 def reproducir_sonido():
     winsound.PlaySound(f"{FOLDER_SOUNDS}sound.wav", winsound.SND_ASYNC)
@@ -66,8 +58,8 @@ def concat_current_line(line):
     root.update()
 
 def enviar_formulario():
-    language_video = next(idioma for idioma in idiomas if idioma[1] == opcion_seleccionada.get())
-
+    language_video = next(idioma for idioma in languages if idioma[1] == opcion_seleccionada.get())
+    model_use = option_model.get()
     if yt_url.get() != "":
         if yt_url.get().find("youtu") == -1:
             messagebox.showinfo("Error con video", "Debes ingresar una url de youtube")
@@ -104,7 +96,7 @@ def enviar_formulario():
         clear_name = video_name.get()
     
     concat_current_line("Cargando modelo...")
-    modelTranscribe = whisper.load_model("tiny",None,'./models/')
+    modelTranscribe = whisper.load_model(model_use,None,'./models/')
     concat_current_line("Modelo cargado")
 
 
@@ -125,7 +117,7 @@ def enviar_formulario():
     concat_current_line("Transcripción guardada")
 
     concat_current_line("cargando modelo de traducción...")
-    model = whisper.load_model("large-v2",None,'./models/')
+    model = whisper.load_model(model_use,None,'./models/')
     concat_current_line("Modelo cargado")
 
     decode_options = dict(language=language_video[0])
@@ -158,13 +150,14 @@ def seleccionar_archivo():
         duration = f"{clip.duration} segundos"
     video_time.set(duration)
 
-nombres_idiomas = [idioma[1] for idioma in idiomas]
+nombres_idiomas = [idioma[1] for idioma in languages]
 
 # Code tkinder window
 root = Tk()
 root.resizable(0,0)
 root.title("Transcribe audio to text")
 opcion_seleccionada = StringVar(value="español")
+option_model = StringVar(value="large-v2")
 
 video_name = StringVar()
 yt_url = StringVar()
@@ -186,6 +179,8 @@ label_languages = Label(root, text="Seleccionar Idiomas:")
 
 boton = Button(root, text="Seleccionar archivo", command=seleccionar_archivo)
 select_idioma = OptionMenu(root, opcion_seleccionada, *nombres_idiomas)
+
+select_model = OptionMenu(root, option_model,*models )
 
 # scrolling start
 frame = Frame(root)
@@ -211,11 +206,12 @@ canvas.config(scrollregion=canvas.bbox("all"))
 ytInput.grid(row=0, column=0)
 etiqueta_nombre.grid(row=1, column=0)
 label_video_time.grid(row=2, column=0)
-boton.grid(row=3, column=0)
-label_languages.grid(row=4, column=0)
-select_idioma.grid(row=5, column=0)
-label_list_result.grid(row=6, column=0)
+select_model.grid(row=3, column=0)
+boton.grid(row=4, column=0)
+label_languages.grid(row=5, column=0)
+select_idioma.grid(row=6, column=0)
+label_list_result.grid(row=7, column=0)
 boton_enviar = Button(root, text="Crear Traducciones", command=enviar_formulario)
-boton_enviar.grid(row=7, column=0)
+boton_enviar.grid(row=8, column=0)
 
 root.mainloop()
