@@ -2,6 +2,9 @@
 
 This is a simple script to extract text from video files.
 
+![image](https://user-images.githubusercontent.com/57574910/219519136-9c58c20e-5b75-4c1c-b31a-895821a20399.png)
+
+
 ## create enviroment and install dependencies
 
 ```bash
