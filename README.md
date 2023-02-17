@@ -32,7 +32,7 @@ This is a simple script to extract text from video files.
     python main.py
 ```
 
-## if you wnat download all model
+## if you want download all model
 
 - download model and move in folder models
 
