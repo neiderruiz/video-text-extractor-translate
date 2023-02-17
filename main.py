@@ -4,60 +4,16 @@ from tkinter import filedialog
 from moviepy.video.io.VideoFileClip import VideoFileClip
 import whisper
 from whisper.utils import get_writer
-import subprocess
 import os
 import pytube as pt
-import re
 from tkinter import messagebox
-import winsound
-import datetime
 from modules.declarations import languages, models, FOLDER_SOUNDS
-
-
-
-def reproducir_sonido():
-    winsound.PlaySound(f"{FOLDER_SOUNDS}sound.wav", winsound.SND_ASYNC)
-
-def clearName(name):
-    clear_name = re.sub(r'[^\w\s]', '', name).strip()
-    return clear_name
-
-def nameToMp3(name):
-    clear_name = clearName(name)
-    nameMp3 = clear_name.replace(' ','-')+".mp3".lower()
-    return nameMp3
-
-def rename_videos():
-    with os.scandir('./') as entries:
-        for entry in entries:
-            if entry.name.endswith(".mp4") and entry.is_file():
-                name_video = entry.name.replace(".mp4","")
-                nameMp3 = nameToMp3(name_video)
-                #remove video
-                os.rename(entry.name,nameMp3)
-                #remove if exist
-                if os.path.exists(f"{FOLDER_SOUNDS}{nameMp3}"):
-                    os.remove(f"{FOLDER_SOUNDS}{nameMp3}")
-                #move video to folder
-                os.rename(nameMp3, f"{FOLDER_SOUNDS}{nameMp3}")
-
-def convert_video_to_audio_ffmpeg(video_file, output_ext="mp3"):
-    """Converts video to audio directly using `ffmpeg` command
-    with the help of subprocess module"""
-    filename, ext = os.path.splitext(video_file)
-    subprocess.call(["ffmpeg", "-y", "-i", video_file, f"{filename}.{output_ext}"], 
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.STDOUT)
-
+from modules.utils import clearName, nameToMp3, rename_videos, convert_video_to_audio_ffmpeg, concat_current_line, reproducir_sonido
 
 def verbose_callback(language,start, end, result, text):
-    concat_current_line(f"[{start} --> {end}]")
+    concat_current_line(root,current_line,f"[{start} --> {end}]")
 
-def concat_current_line(line):
-    current_line.set(f"{line} | Time {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} \n {current_line.get()}")
-    root.update()
-
-def enviar_formulario():
+def press_form():
     language_video = next(idioma for idioma in languages if idioma[1] == opcion_seleccionada.get())
     model_use = option_model.get()
     if yt_url.get() != "":
@@ -76,10 +32,10 @@ def enviar_formulario():
         
         if os.path.exists(f"{FOLDER_SOUNDS}{yt.title}.mp4"):
             os.remove(f"{FOLDER_SOUNDS}{yt.title}.mp4")
-        concat_current_line(f"Descargando video de youtube...")
+        concat_current_line(root,current_line,f"Descargando video de youtube...")
         t = yt.streams.filter(only_audio=True)
         t[0].download()
-        concat_current_line(f"Renombrando video a audio...")
+        concat_current_line(root,current_line,f"Renombrando video a audio...")
         rename_videos()
         #remove al characteres title
         video_name.set(yt.title.replace("/","-")[:50])
@@ -89,19 +45,19 @@ def enviar_formulario():
         return
 
     if video_route.get() and yt_url.get() == "":
-        concat_current_line(f"Convirtiendo video a audio...")
+        concat_current_line(root,current_line,f"Convirtiendo video a audio...")
         convert_video_to_audio_ffmpeg(video_route.get())
-        concat_current_line(f"fin de conversión de video a audio")
+        concat_current_line(root,current_line,f"fin de conversión de video a audio")
         audio_route = video_route.get().replace('.mp4','.mp3')
         clear_name = video_name.get()
     
-    concat_current_line("Cargando modelo...")
+    concat_current_line(root,current_line,"Cargando modelo...")
     modelTranscribe = whisper.load_model(model_use,None,'./models/')
-    concat_current_line("Modelo cargado")
+    concat_current_line(root,current_line,"Modelo cargado")
 
 
     #transcribe
-    concat_current_line(f"Transcribiendo audio...")
+    concat_current_line(root,current_line,f"Transcribiendo audio...")
     decode_options = dict(language=language_video[0])
     result = modelTranscribe.transcribe(audio_route,verbose=True,verbose_callback=verbose_callback, fp16=False,**decode_options)
 
@@ -110,32 +66,30 @@ def enviar_formulario():
     else:
         writer = get_writer("vtt",os.path.dirname(video_route.get()))
 
-    concat_current_line("Transcripción completa")
+    concat_current_line(root,current_line,"Transcripción completa")
 
     writer(result, nameToMp3(clear_name).replace('.mp3','').replace('.mp4','')) 
 
-    concat_current_line("Transcripción guardada")
+    concat_current_line(root,current_line,"Transcripción guardada")
 
-    concat_current_line("cargando modelo de traducción...")
+    concat_current_line(root,current_line,"cargando modelo de traducción...")
     model = whisper.load_model(model_use,None,'./models/')
-    concat_current_line("Modelo cargado")
+    concat_current_line(root,current_line,"Modelo cargado")
 
     decode_options = dict(language=language_video[0])
     transcribe_options = dict(task="translate", **decode_options)
-    concat_current_line("Traduciendo...")
+    concat_current_line(root,current_line,"Traduciendo...")
     result = model.transcribe(audio_route,verbose=True,verbose_callback=verbose_callback,fp16=False,**transcribe_options)
     writer = get_writer("vtt", video_route.get().replace(clear_name,''))  
     writer(result, f"{clear_name.replace('.mp4','')}-en")
-    concat_current_line("Traducción guardada")
+    concat_current_line(root,current_line,"Traducción guardada")
     reproducir_sonido()
 
 # Define una función para seleccionar un archivo
-def seleccionar_archivo():
+def select_file():
     archivo = filedialog.askopenfilename(filetypes=[("Archivos de video", "*.mp4;*.avi;*.mov")])
-
     if(archivo == ""):
         return
-    print("Archivo seleccionado:", archivo)
     ##get name video
     name = archivo.split("/")[-1]
     #duración del video
@@ -150,7 +104,7 @@ def seleccionar_archivo():
         duration = f"{clip.duration} segundos"
     video_time.set(duration)
 
-nombres_idiomas = [idioma[1] for idioma in languages]
+name_languages = [idioma[1] for idioma in languages]
 
 # Code tkinder window
 root = Tk()
@@ -177,8 +131,8 @@ ytInput = Entry(root, width=30, textvariable=yt_url)
 
 label_languages = Label(root, text="Seleccionar Idiomas:")
 
-boton = Button(root, text="Seleccionar archivo", command=seleccionar_archivo)
-select_idioma = OptionMenu(root, opcion_seleccionada, *nombres_idiomas)
+boton = Button(root, text="Seleccionar archivo", command=select_file)
+select_idioma = OptionMenu(root, opcion_seleccionada, *name_languages)
 
 select_model = OptionMenu(root, option_model,*models )
 
@@ -211,7 +165,7 @@ boton.grid(row=4, column=0)
 label_languages.grid(row=5, column=0)
 select_idioma.grid(row=6, column=0)
 label_list_result.grid(row=7, column=0)
-boton_enviar = Button(root, text="Crear Traducciones", command=enviar_formulario)
+boton_enviar = Button(root, text="Crear Traducciones", command=press_form)
 boton_enviar.grid(row=8, column=0)
 
 root.mainloop()
