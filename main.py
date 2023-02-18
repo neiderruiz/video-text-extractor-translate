@@ -9,6 +9,7 @@ import pytube as pt
 from tkinter import messagebox
 from modules.declarations import languages, models, FOLDER_SOUNDS
 from modules.utils import clearName, nameToMp3, rename_videos, convert_video_to_audio_ffmpeg, concat_current_line, reproducir_sonido
+import threading
 
 def verbose_callback(language,start, end, result, text):
     concat_current_line(root,current_line,f"[{start} --> {end}]")
@@ -80,7 +81,12 @@ def press_form():
     transcribe_options = dict(task="translate", **decode_options)
     concat_current_line(root,current_line,"Traduciendo...")
     result = model.transcribe(audio_route,verbose=True,verbose_callback=verbose_callback,fp16=False,**transcribe_options)
-    writer = get_writer("vtt", video_route.get().replace(clear_name,''))  
+    
+    if yt_url.get() != "":
+        writer = get_writer("vtt", f"{FOLDER_SOUNDS}")
+    else:
+        writer = get_writer("vtt",os.path.dirname(video_route.get()))
+        
     writer(result, f"{clear_name.replace('.mp4','')}-en")
     concat_current_line(root,current_line,"Traducción guardada")
     reproducir_sonido()
@@ -105,6 +111,12 @@ def select_file():
     video_time.set(duration)
 
 name_languages = [idioma[1] for idioma in languages]
+
+
+def run_traslate():
+    # Crea un hilo para ejecutar la tarea pesada
+    t = threading.Thread(target=press_form)
+    t.start()
 
 # Code tkinder window
 root = Tk()
@@ -166,7 +178,7 @@ boton.grid(row=4, column=0)
 label_languages.grid(row=5, column=0)
 select_idioma.grid(row=6, column=0)
 label_list_result.grid(row=7, column=0)
-boton_enviar = Button(root, text="Crear Traducciones", command=press_form)
+boton_enviar = Button(root, text="Crear Traducciones", command=run_traslate)
 boton_enviar.grid(row=8, column=0)
 
 root.mainloop()
