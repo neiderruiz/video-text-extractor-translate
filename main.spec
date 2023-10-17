@@ -8,8 +8,8 @@ a = Analysis(
     binaries=[],
     datas=[
         ('./models/', 'models'),
-        ('./assets/icon.ico','./assets/'),
-        ('./modules/','modules/'),
+        ('./assets/icon.ico','assets'),
+        ('./modules/','modules'),
         ('./fix/','fix'),
         ('./sounds/','sounds'),
         ],
