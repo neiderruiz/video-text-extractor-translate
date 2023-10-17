@@ -8,3 +8,5 @@
 /*.mp3
 /*.vtt
 /*.mp4
+dist
+build
