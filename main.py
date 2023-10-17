@@ -11,6 +11,12 @@ from modules.declarations import languages, models, FOLDER_SOUNDS
 from modules.utils import clearName, nameToMp3, rename_videos, convert_video_to_audio_ffmpeg, concat_current_line, reproducir_sonido
 import threading
 
+optionsWriter = {
+    "max_line_width": 80,
+    "max_line_count": 2,
+    "highlight_words": True
+}
+
 def verbose_callback(language,start, end, result, text):
     concat_current_line(root,current_line,f"[{start} --> {end}]")
 
@@ -69,7 +75,7 @@ def press_form():
 
     concat_current_line(root,current_line,"Transcripción completa")
 
-    writer(result, nameToMp3(clear_name).replace('.mp3','').replace('.mp4','')) 
+    writer(result, nameToMp3(clear_name).replace('.mp3','').replace('.mp4',''), optionsWriter) 
 
     concat_current_line(root,current_line,"Transcripción guardada")
 
@@ -87,7 +93,7 @@ def press_form():
     else:
         writer = get_writer("vtt",os.path.dirname(video_route.get()))
         
-    writer(result, f"{clear_name.replace('.mp4','')}-en")
+    writer(result, f"{clear_name.replace('.mp4','')}-en", optionsWriter)
     concat_current_line(root,current_line,"Traducción guardada")
     reproducir_sonido()
 
