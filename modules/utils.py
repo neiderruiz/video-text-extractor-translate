@@ -31,13 +31,20 @@ def rename_videos():
                 #move video to folder
                 os.rename(nameMp3, f"{FOLDER_SOUNDS}{nameMp3}")
 
-def convert_video_to_audio_ffmpeg(video_file, output_ext="mp3"):
+def convert_video_to_audio_ffmpeg(video_file, output_ext="mp3", route_save=None):
     """Converts video to audio directly using `ffmpeg` command
     with the help of subprocess module"""
-    filename, ext = os.path.splitext(video_file)
-    subprocess.call(["ffmpeg", "-y", "-i", video_file, f"{filename}.{output_ext}"], 
+    filename = os.path.basename(video_file)  # Obtiene el nombre del archivo sin la ruta
+    filename, ext = os.path.splitext(filename)  # Separa el nombre del archivo de la extensión
+    output_file = f"{filename}.{output_ext}"  # Crea el nombre del archivo de salida
+    
+    if route_save:  
+        output_file = os.path.join(route_save, output_file)  # Une la ruta de salida con el nombre del archivo de salida
+    
+    subprocess.call(["ffmpeg", "-y", "-i", video_file, output_file], 
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.STDOUT)
+    return output_file
 
 def concat_current_line(root,current_line,text):
     current_line.set(f"{text} | Time {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} \n {current_line.get()}")
