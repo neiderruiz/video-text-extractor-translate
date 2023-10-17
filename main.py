@@ -1,15 +1,15 @@
 import modules.fix_translate
-from tkinter import *
-from tkinter import filedialog
-from moviepy.video.io.VideoFileClip import VideoFileClip
+import tkinter as tk
+from tkinter import ttk, filedialog as fd, messagebox
+import threading
+from modules.declarations import languages, models, FOLDER_SOUNDS
+import re
+import pytube as pt
+import os
+from modules.utils import clearName, nameToMp3, rename_videos, convert_video_to_audio_ffmpeg, concat_current_line, run_sound_finish
+from moviepy.editor import AudioFileClip
 import whisper
 from whisper.utils import get_writer
-import os
-import pytube as pt
-from tkinter import messagebox
-from modules.declarations import languages, models, FOLDER_SOUNDS
-from modules.utils import clearName, nameToMp3, rename_videos, convert_video_to_audio_ffmpeg, concat_current_line, reproducir_sonido
-import threading
 
 optionsWriter = {
     "max_line_width": 80,
@@ -17,174 +17,227 @@ optionsWriter = {
     "highlight_words": True
 }
 
-def verbose_callback(language,start, end, result, text):
-    concat_current_line(root,current_line,f"[{start} --> {end}]")
+class App(tk.Tk):
+    def __init__(self):
+        super().__init__()
 
-def press_form():
-    language_video = next(idioma for idioma in languages if idioma[1] == opcion_seleccionada.get())
-    model_use = option_model.get()
-    if yt_url.get() != "":
-        if yt_url.get().find("youtu") == -1:
-            messagebox.showinfo("Error con video", "Debes ingresar una url de youtube")
-            return
+        self.title('Extract Audio from Video')
+        self.iconbitmap('./assets/icon.ico')
+
+        self.frm = ttk.Frame(self, padding=10, width=300, height=400)
+        self.frm.grid()
+
+        self.setup_styles()
+        self.setup_widgets()
+
+    def setup_styles(self):
+        self.style = ttk.Style()
+        self.style.configure(
+            'TEntry',
+            padding=[5, 2],
+            font=('Arial', 12),
+            fieldbackground='white',
+            foreground='black',
+            borderwidth=2,
+            relief='solid',
+            bordercolor='#ccc'
+        )
+        self.style.configure(
+            'TButton',
+            padding=[5, 5],
+            font=('Arial', 12),
+            relief='raised',
+            borderwidth=2,
+        )
+        self.style.configure(
+            'TLabel',
+            font=('Arial', 12),
+        )
+        self.style.configure(
+            'TLabelFrame',
+            font=('Arial', 12, 'bold'),
+            borderwidth=2,
+            relief='solid',
+        )
+
+    def setup_widgets(self):
+        self.yt_url_var = tk.StringVar()  # Crear una nueva instancia de StringVar
+        self.yt_url, _ = self.create_entry(
+            self.frm, "Url Video Youtube", 0, 0, textvariable=self.yt_url_var)  # Pasar StringVar a create_entry
+        self.yt_url_var.trace_add("write", self.check_youtube_url)  # Añadir un rastreador para cambios en la variable
+             
+        self.select_file_btn = self.create_button(
+            self.frm, "Select File", self.select_file, 3, 0)
+
+        self.reset_btn = self.create_button(
+            self.frm, "Reset", self.reset, 3, 1)
+
+        self.process_video_btn = self.create_button(
+            self.frm, "Procesar Video", self.process_video, 3, 0)
+
+        # Crear un LabelFrame para el grupo Miniatura
+        self.miniature_frame = ttk.LabelFrame(
+            self.frm, text="Parametros a procesar", padding=(10, 5))
+        self.miniature_frame.grid(
+            column=0, row=4, padx=10, pady=10, columnspan=4, sticky=(tk.W, tk.E))  # Ajuste en columnspan
         
-        yt = pt.YouTube(yt_url.get())
+        # Crear el widget OptionMenu para seleccionar idioma
+        self.opcion_seleccionada = tk.StringVar(value="español")
+        self.name_languages = [idioma[1] for idioma in languages]  # Ejemplo de lista de idiomas
+        self.select_idioma_label = ttk.Label(self.miniature_frame, text="Seleccionar Idioma:")
+        self.select_idioma_label.grid(column=0, row=4)
+        self.select_idioma = tk.OptionMenu(self.miniature_frame, self.opcion_seleccionada, *self.name_languages)
+        self.select_idioma.grid(column=0, row=5, sticky=tk.W)
+
+        # Crear el widget OptionMenu para seleccionar modelo
+        self.option_model = tk.StringVar(value="large-v2")
+        self.models = [modelo for modelo in models]  # Lista de modelos
+        self.select_model_label = ttk.Label(self.miniature_frame, text="Seleccionar Modelo:")
+        self.select_model_label.grid(column=1, row=4)  # Puedes ajustar la columna y la fila según lo necesites
+        self.select_model = tk.OptionMenu(self.miniature_frame, self.option_model, *self.models)
+        self.select_model.grid(column=1, row=5, sticky=tk.W)  # Puedes ajustar la columna y la fila según lo necesites
+
+        self.hide_miniature_frame_and_button()
+
+    def check_youtube_url(self, *args):
+        yt_url = self.yt_url_var.get()
+        if self.is_valid_youtube_url(yt_url):
+            self.show_miniature_frame_and_button()
+            self.select_file_btn.grid_remove()
+        else:
+            self.hide_miniature_frame_and_button()
+
+    def create_entry(self, parent, label_text, row, column, validate=False, textvariable=None):
+        label = ttk.Label(parent, text=label_text)
+        label.grid(column=column, row=row * 2)
+
+        if validate:
+            validate_command = self.register(self.validate_input)
+            entry = ttk.Entry(parent, width=40, validate='key', validatecommand=(
+                validate_command, '%P'), textvariable=textvariable)  # Cambié width a 40
+        else:
+            # Cambié width a 40
+            entry = ttk.Entry(parent, width=40, textvariable=textvariable)
+
+        entry.grid(column=column, row=row * 2 + 1)
+        return entry, label  # Devuelve tanto la entrada como la etiqueta
+
+    def is_valid_youtube_url(self, url):
+        youtube_regex = re.compile(
+            r'(https?://)?(www\.)?(youtube\.com|youtu\.?be)/.+')
+        return youtube_regex.match(url) is not None
+
+    def create_button(self, parent, text, command, row, column):
+        btn = ttk.Button(parent, text=text, command=command)
+        btn.grid(column=column, row=row)
+        return btn
+
+    def select_file(self):
+        filename = fd.askopenfilename(
+            filetypes=[('videos', '*.mp4'), ('All files', '*.*')])
+        if filename:  # Si un archivo fue seleccionado
+            self.yt_url_var.set(filename)  # Establecer la URL de YouTube
+            self.show_miniature_frame_and_button()
+        else:  # Si no se seleccionó ningún archivo (se presionó 'Cancelar')
+            self.hide_miniature_frame_and_button()
+
+    def process_video(self):
+        # print current language
+        print(self.opcion_seleccionada.get())
+        # print current model
+        print(self.option_model.get())
+        # print current url
+        print(self.yt_url_var.get())
+
+        if self.is_valid_youtube_url(self.yt_url_var.get()):
+            audio_route = getVideoYT(self.yt_url_var.get())
+            print('Procesando video youtube')
+        else:
+            audio_route =  convert_video_to_audio_ffmpeg(self.yt_url_var.get(), route_save=FOLDER_SOUNDS)
+            print('Procesando archivo local')
+        modelTranscribe = whisper.load_model(self.option_model.get(),None,'./models/')
+        
+        language_video = next(idioma for idioma in languages if idioma[1] == self.opcion_seleccionada.get())
+        decode_options = dict(language=language_video[0])
+
+        print(audio_route,'audio_route')
+        result = modelTranscribe.transcribe(audio_route,verbose=True,verbose_callback=verbose_callback, fp16=False,**decode_options)
+
+        writer = get_writer("vtt", f"{FOLDER_SOUNDS}")
+        name_transcribe = f"{audio_route.split('/')[-1].replace('.mp3','')}-{language_video[0]}"
+        writer(result, name_transcribe, optionsWriter) 
+
+        
+
+        # remove audio
+        if os.path.exists(audio_route):
+            os.remove(audio_route)
+
+        print('Transcripción completa')
+        run_sound_finish()
+
+    def validate_input(self, value_if_allowed):
+        if value_if_allowed == '' or value_if_allowed.isdigit():
+            return True
+        return False
+
+    def show_miniature_frame_and_button(self):
+        self.miniature_frame.grid(
+            column=0, row=4, padx=10, pady=10, sticky=(tk.W, tk.E))
+        self.process_video_btn.grid(column=1, row=1)  # Muestra el botón
+
+    def hide_miniature_frame_and_button(self):
+        self.miniature_frame.grid_remove()
+        self.process_video_btn.grid_remove()  # Oculta el botón
+
+    def reset(self):
+        self.yt_url_var.set('')  # Limpiar la entrada de la URL de YouTube
+        self.hide_miniature_frame_and_button()  # Ocultar los widgets
+        self.yt_url.grid(column=0, row=1)  # Muestra la entrada de URL de YouTube
+        self.select_file_btn.grid(column=0, row=3)  # Muestra el botón de selección de archivo
+
+
+from moviepy.editor import *
+
+def getVideoYT(url):
+    try:
+        yt = pt.YouTube(url)
         clear_name = clearName(yt.title)
         duration = yt.length
-        video_time.set(f"Duración del video: {duration} segundos")
+        # video_time.set(f"Duración del video: {duration} segundos")
         nameMp3 = nameToMp3(yt.title)
         audio_route = f"{FOLDER_SOUNDS}{nameMp3}"
-        if os.path.exists(nameMp3):
-            os.remove(nameMp3)
-        
-        if os.path.exists(f"{FOLDER_SOUNDS}{yt.title}.mp4"):
-            os.remove(f"{FOLDER_SOUNDS}{yt.title}.mp4")
-        concat_current_line(root,current_line,f"Descargando video de youtube...")
-        t = yt.streams.filter(only_audio=True)
-        t[0].download()
-        concat_current_line(root,current_line,f"Renombrando video a audio...")
-        rename_videos()
-        #remove al characteres title
-        video_name.set(yt.title.replace("/","-")[:50])
-        root.update()
-    if yt_url.get() == "" and not video_route.get():
-        messagebox.showinfo("Error con video", "Debes seleccionar un video")
-        return
+        if os.path.exists(audio_route):
+            os.remove(audio_route)
+            
+        temp_file = f"{FOLDER_SOUNDS}{clear_name}.mp4"
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+        # concat_current_line(root,current_line,f"Descargando video de youtube...")
+        t = yt.streams.filter(only_audio=True).order_by('abr').desc()
+        video_name = f"{clear_name}.mp4"
+        t[0].download(output_path=FOLDER_SOUNDS, filename=video_name)
+        # concat_current_line(root,current_line,f"Renombrando video a audio...")
 
-    if video_route.get() and yt_url.get() == "":
-        concat_current_line(root,current_line,f"Convirtiendo video a audio...")
-        convert_video_to_audio_ffmpeg(video_route.get())
-        concat_current_line(root,current_line,f"fin de conversión de video a audio")
-        audio_route = video_route.get().replace('.mp4','.mp3')
-        clear_name = video_name.get()
-    
-    concat_current_line(root,current_line,"Cargando modelo...")
-    modelTranscribe = whisper.load_model(model_use,None,'./models/')
-    concat_current_line(root,current_line,"Modelo cargado")
+        # Convertir el archivo a MP3
+        audio = AudioFileClip(temp_file)
+        audio.write_audiofile(audio_route)
 
+        # Eliminar el archivo temporal
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
 
-    #transcribe
-    concat_current_line(root,current_line,f"Transcribiendo audio...")
-    decode_options = dict(language=language_video[0])
-    result = modelTranscribe.transcribe(audio_route,verbose=True,verbose_callback=verbose_callback, fp16=False,**decode_options)
+        # return route audio
+        return audio_route
 
-    if yt_url.get() != "":
-        writer = get_writer("vtt", f"{FOLDER_SOUNDS}")
-    else:
-        writer = get_writer("vtt",os.path.dirname(video_route.get()))
+    except Exception as e:
+        messagebox.showerror("Error", f"Ocurrió un error: {str(e)}")
 
-    concat_current_line(root,current_line,"Transcripción completa")
-
-    writer(result, nameToMp3(clear_name).replace('.mp3','').replace('.mp4',''), optionsWriter) 
-
-    concat_current_line(root,current_line,"Transcripción guardada")
-
-    concat_current_line(root,current_line,"cargando modelo de traducción...")
-    model = whisper.load_model(model_use,None,'./models/')
-    concat_current_line(root,current_line,"Modelo cargado")
-
-    decode_options = dict(language=language_video[0])
-    transcribe_options = dict(task="translate", **decode_options)
-    concat_current_line(root,current_line,"Traduciendo...")
-    result = model.transcribe(audio_route,verbose=True,verbose_callback=verbose_callback,fp16=False,**transcribe_options)
-    
-    if yt_url.get() != "":
-        writer = get_writer("vtt", f"{FOLDER_SOUNDS}")
-    else:
-        writer = get_writer("vtt",os.path.dirname(video_route.get()))
-        
-    writer(result, f"{clear_name.replace('.mp4','')}-en", optionsWriter)
-    concat_current_line(root,current_line,"Traducción guardada")
-    reproducir_sonido()
-
-# Define una función para seleccionar un archivo
-def select_file():
-    archivo = filedialog.askopenfilename(filetypes=[("Archivos de video", "*.mp4;*.avi;*.mov")])
-    if(archivo == ""):
-        return
-    ##get name video
-    name = archivo.split("/")[-1]
-    #duración del video
-    clip = VideoFileClip(archivo)
-    #minutes
-    video_name.set(name)
-    video_route.set(archivo)
-    minutes = int(clip.duration/60)
-    if(minutes>1):
-        duration = f"{minutes} minutos"
-    else:
-        duration = f"{clip.duration} segundos"
-    video_time.set(duration)
-
-name_languages = [idioma[1] for idioma in languages]
+def verbose_callback(language,start, end, result, text):
+    print(f"[{start} --> {end}]")
 
 
-def run_traslate():
-    # Crea un hilo para ejecutar la tarea pesada
-    t = threading.Thread(target=press_form)
-    t.start()
 
-# Code tkinder window
-root = Tk()
-root.resizable(0,0)
-root.title("Transcribe audio to text")
-opcion_seleccionada = StringVar(value="español")
-option_model = StringVar(value="large-v2")
-
-video_name = StringVar()
-yt_url = StringVar()
-video_route = StringVar()
-video_time = StringVar()
-list_result = StringVar()
-current_line = StringVar()
-# labels entry forms
-etiqueta_nombre = Label(root, textvariable=video_name)
-label_video_time = Label(root, textvariable=video_time)
-label_list_result = Label(root, textvariable=list_result)
-label_current_line = Label(root, textvariable=current_line)
-
-#entry text video youtube
-ytInput = Entry(root, width=30, textvariable=yt_url,fg='grey',show='')
-ytInput.insert(0, "add url video Yt")
-
-
-label_languages = Label(root, text="Seleccionar Idiomas:")
-
-boton = Button(root, text="Seleccionar archivo", command=select_file)
-select_idioma = OptionMenu(root, opcion_seleccionada, *name_languages)
-
-select_model = OptionMenu(root, option_model,*models )
-
-# scrolling start
-frame = Frame(root)
-frame.grid(row=10, column=0, sticky="nsew")
-
-canvas = Canvas(frame)
-canvas.grid(row=10, column=0, sticky="nsew")
-
-scrollbar = Scrollbar(frame, command=canvas.yview,width=15)
-scrollbar.grid(row=10, column=1, sticky="ns")
-
-canvas.configure(yscrollcommand=scrollbar.set)
-
-label = Label(canvas,textvariable=current_line)
-
-canvas.create_window((0, 0), window=label, anchor="nw")
-
-label.update_idletasks()
-canvas.config(scrollregion=canvas.bbox("all"))
-# scrolling end
-
-#add grid layout
-ytInput.grid(row=0, column=0)
-etiqueta_nombre.grid(row=1, column=0)
-label_video_time.grid(row=2, column=0)
-select_model.grid(row=3, column=0)
-boton.grid(row=4, column=0)
-label_languages.grid(row=5, column=0)
-select_idioma.grid(row=6, column=0)
-label_list_result.grid(row=7, column=0)
-boton_enviar = Button(root, text="Crear Traducciones", command=run_traslate)
-boton_enviar.grid(row=8, column=0)
-
-root.mainloop()
+if __name__ == "__main__":
+    app = App()
+    app.mainloop()
