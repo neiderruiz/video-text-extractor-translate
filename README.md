@@ -2,16 +2,15 @@
 
 This is a simple script to extract text from video files.
 
-![image](https://github.com/neiderruiz/video-text-extractor-translate/assets/57574910/3a84f5ec-620c-4d43-8f00-dbf627361eec)
+![image](https://github.com/neiderruiz/video-text-extractor-translate/assets/57574910/1b9d0398-39e7-43d7-bb48-3f8287bc248d)
 
 whend add video or url
 
-![image](https://github.com/neiderruiz/video-text-extractor-translate/assets/57574910/207f4a1f-904c-43e0-897b-15cd5eaa46eb)
+![image](https://github.com/neiderruiz/video-text-extractor-translate/assets/57574910/dfeb432b-c580-4133-b907-eb3a7580d542)
 
 add direct access
 
-![image](https://github.com/neiderruiz/video-text-extractor-translate/assets/57574910/b9d01297-c183-4b52-8679-f04c7de27f14)
-
+![image](https://github.com/neiderruiz/video-text-extractor-translate/assets/57574910/f339cbf2-f61c-4181-94a6-a49b7eff0198)
 
 ## create enviroment and install dependencies
 
