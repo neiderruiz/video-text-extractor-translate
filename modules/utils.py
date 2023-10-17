@@ -5,7 +5,7 @@ import subprocess
 import datetime
 
 from modules.declarations import FOLDER_SOUNDS
-def reproducir_sonido():
+def run_sound_finish():
     winsound.PlaySound(f"{FOLDER_SOUNDS}sound.wav", winsound.SND_ASYNC)
 
 def clearName(name):
