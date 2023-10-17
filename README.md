@@ -35,6 +35,14 @@ This is a simple script to extract text from video files.
     python main.py
 ```
 
+## generate .exe
+
+- run command
+
+```bash
+ pyinstaller main.spec
+```
+
 ## if you want download all model
 
 - download model and move in folder models
