@@ -9,7 +9,7 @@ def reproducir_sonido():
     winsound.PlaySound(f"{FOLDER_SOUNDS}sound.wav", winsound.SND_ASYNC)
 
 def clearName(name):
-    clear_name = re.sub(r'[^\w\s]', '', name).strip()
+    clear_name = re.sub(r'[^\w\s-]', '', name).strip()
     return clear_name
 
 def nameToMp3(name):
