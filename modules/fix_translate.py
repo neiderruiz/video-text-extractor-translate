@@ -1,3 +1,4 @@
+import platform
 import shutil
 import os
 
@@ -12,5 +13,13 @@ def copy_file(src, dst):
         print(f"An error occurred: {e}")
 
 source_file = "./fix/transcribe_fix.py"
-destination_file = "./env/Lib/site-packages/whisper/transcribe.py"
+
+os_name = platform.system()
+
+if os_name == 'Windows':
+    destination_file = "./env/Lib/site-packages/whisper/transcribe.py"
+elif os_name == 'Darwin':  # macOS
+    destination_file = "./env/Lib/python3.10/site-packages/whisper/transcribe.py"
+else:
+    print(f"Unsupported OS: {os_name}")
 copy_file(source_file, destination_file)
