@@ -1,4 +1,4 @@
-import winsound
+import simpleaudio as sa
 import re
 import os
 import subprocess
@@ -6,7 +6,10 @@ import datetime
 
 from modules.declarations import FOLDER_SOUNDS
 def run_sound_finish():
-    winsound.PlaySound(f"{FOLDER_SOUNDS}sound.wav", winsound.SND_ASYNC)
+    wave_obj = sa.WaveObject.from_wave_file(f"{FOLDER_SOUNDS}sound.wav")
+    play_obj = wave_obj.play()
+    play_obj.wait_done()
+
 
 def clearName(name):
     clear_name = re.sub(r'[^\w\s-]', '', name).strip()
