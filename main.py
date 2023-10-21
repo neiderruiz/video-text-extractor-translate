@@ -99,6 +99,22 @@ class App(tk.Tk):
 
         self.hide_miniature_frame_and_button()
 
+        # button save
+        self.save_directory_var = tk.StringVar()
+        self.select_directory_btn = self.create_button(
+        self.frm, "Select Directory Save", self.select_directory, 3, 1)  
+
+        self.save_directory_label = ttk.Label(self.frm, text="")
+        self.save_directory_label.grid(column=0, row=6, columnspan=2, sticky=tk.W)  # Ajustar row y column según sea necesario
+
+
+    def select_directory(self):
+        directory = fd.askdirectory()
+        if directory:  
+            self.save_directory_var.set(directory)  
+            self.save_directory_label.config(text=f"Save Directory: {directory}") 
+
+
     def check_youtube_url(self, *args):
         yt_url = self.yt_url_var.get()
         if self.is_valid_youtube_url(yt_url):
@@ -142,6 +158,12 @@ class App(tk.Tk):
             self.hide_miniature_frame_and_button()
 
     def process_video(self):
+
+        save_directory = self.save_directory_var.get()
+        if not save_directory:
+            messagebox.showerror('Error', 'Selecciona un directorio para guardar el resultado')
+            return
+
         # print current language
         print(self.opcion_seleccionada.get())
         # print current model
@@ -162,10 +184,11 @@ class App(tk.Tk):
 
         print(audio_route,'audio_route')
         result = modelTranscribe.transcribe(audio_route,verbose=True,verbose_callback=verbose_callback, fp16=False,**decode_options)
-
-        writer = get_writer("vtt", f"{FOLDER_SOUNDS}")
         name_transcribe = f"{audio_route.split('/')[-1].replace('.mp3','')}-{language_video[0]}"
-        writer(result, name_transcribe, optionsWriter) 
+
+        output_path = os.path.join(save_directory, f"{name_transcribe}.vtt")
+        writer = get_writer("vtt", save_directory)
+        writer(result, save_directory, optionsWriter)  
 
         
 
