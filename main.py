@@ -183,7 +183,9 @@ class App(tk.Tk):
         decode_options = dict(language=language_video[0])
 
         print(audio_route,'audio_route')
-        result = modelTranscribe.transcribe(audio_route,verbose=True,verbose_callback=verbose_callback, fp16=False,**decode_options)
+
+
+        result = modelTranscribe.transcribe(audio_route,verbose=True,verbose_callback=verbose_callback, verbose_callback_folder_save=save_directory, fp16=False,**decode_options)
         name_transcribe = f"{audio_route.split('/')[-1].replace('.mp3','')}-{language_video[0]}"
 
         output_path = os.path.join(save_directory, f"{name_transcribe}.vtt")
@@ -256,10 +258,12 @@ def getVideoYT(url):
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error: {str(e)}")
 
-def verbose_callback(language,start, end, result, text):
+def verbose_callback(language,start, end, result, text,verbose_callback_folder_save):
     print(f"[{start} --> {end}]")
-
-
+    file_path = os.path.join(verbose_callback_folder_save, 'transcription.txt')  # Usando directory en lugar de save_directory
+    with open(file_path, 'a', encoding='utf-8') as file:
+        file.write(f"{start} --> {end}\n")
+        file.write(f"{text}\n\n")
 
 if __name__ == "__main__":
     app = App()
