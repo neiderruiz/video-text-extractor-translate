@@ -22,6 +22,7 @@ def transcribe(
     *,
     verbose: Optional[bool] = None,
     verbose_callback: Optional[callable] = None,
+    verbose_callback_folder_save: Optional[str] = None,
     temperature: Union[float, Tuple[float, ...]] = (0.0, 0.2, 0.4, 0.6, 0.8, 1.0),
     compression_ratio_threshold: Optional[float] = 2.4,
     logprob_threshold: Optional[float] = -1.0,
@@ -167,7 +168,7 @@ def transcribe(
         )
         if verbose:
             if verbose_callback is not None:
-                verbose_callback(language=decode_options.get('language'),start=format_timestamp(start), end=format_timestamp(end), text=text, result=result)
+                verbose_callback(language=decode_options.get('language'),start=format_timestamp(start), end=format_timestamp(end), text=text, result=result,verbose_callback_folder_save=verbose_callback_folder_save)
             print(make_safe(f"[{format_timestamp(start)} --> {format_timestamp(end)}] {text}"))
 
     # show the progress bar when verbose is False (otherwise the transcribed text will be printed)
