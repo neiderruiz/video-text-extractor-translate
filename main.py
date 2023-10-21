@@ -10,6 +10,7 @@ from modules.utils import clearName, nameToMp3, rename_videos, convert_video_to_
 from moviepy.editor import AudioFileClip
 import whisper
 from whisper.utils import get_writer
+from moviepy.editor import *
 
 optionsWriter = {
     "max_line_width": 80,
@@ -73,7 +74,8 @@ class App(tk.Tk):
             self.frm, "Reset", self.reset, 3, 1)
 
         self.process_video_btn = self.create_button(
-            self.frm, "Procesar Video", self.process_video, 3, 0)
+            self.frm, "Procesar Video", self.start_process_video_thread, 3, 0)
+
 
         # Crear un LabelFrame para el grupo Miniatura
         self.miniature_frame = ttk.LabelFrame(
@@ -106,6 +108,10 @@ class App(tk.Tk):
 
         self.save_directory_label = ttk.Label(self.frm, text="")
         self.save_directory_label.grid(column=0, row=6, columnspan=2, sticky=tk.W)  # Ajustar row y column según sea necesario
+
+        # display information
+        self.transcription_text = tk.Text(self.frm, wrap='word', width=80, height=10)
+        self.transcription_text.grid(column=0, row=7, columnspan=2)  # Ajusta la fila y la columna según sea necesario
 
 
     def select_directory(self):
@@ -172,33 +178,30 @@ class App(tk.Tk):
         print(self.yt_url_var.get())
 
         if self.is_valid_youtube_url(self.yt_url_var.get()):
-            audio_route = getVideoYT(self.yt_url_var.get())
+            audio_route = self.getVideoYT()
             print('Procesando video youtube')
+            self.update_transcription(f"Procesando video youtube")
         else:
             audio_route =  convert_video_to_audio_ffmpeg(self.yt_url_var.get(), route_save=FOLDER_SOUNDS)
             print('Procesando archivo local')
+            self.update_transcription(f"Procesando archivo local")
         modelTranscribe = whisper.load_model(self.option_model.get(),None,'./models/')
         
         language_video = next(idioma for idioma in languages if idioma[1] == self.opcion_seleccionada.get())
         decode_options = dict(language=language_video[0])
 
-        print(audio_route,'audio_route')
-
-
-        result = modelTranscribe.transcribe(audio_route,verbose=True,verbose_callback=verbose_callback, verbose_callback_folder_save=save_directory, fp16=False,**decode_options)
+        result = modelTranscribe.transcribe(audio_route,verbose=True,verbose_callback=self.verbose_callback, verbose_callback_folder_save=save_directory, fp16=False,**decode_options)
         name_transcribe = f"{audio_route.split('/')[-1].replace('.mp3','')}-{language_video[0]}"
 
         output_path = os.path.join(save_directory, f"{name_transcribe}.vtt")
         writer = get_writer("vtt", save_directory)
         writer(result, save_directory, optionsWriter)  
 
-        
-
         # remove audio
         if os.path.exists(audio_route):
             os.remove(audio_route)
 
-        print('Transcripción completa')
+        self.update_transcription(f"Transcripción completa")
         run_sound_finish()
 
     def validate_input(self, value_if_allowed):
@@ -221,49 +224,65 @@ class App(tk.Tk):
         self.yt_url.grid(column=0, row=1)  # Muestra la entrada de URL de YouTube
         self.select_file_btn.grid(column=0, row=3)  # Muestra el botón de selección de archivo
 
+    def verbose_callback(self,language,start, end, result, text,verbose_callback_folder_save):
+        print(f"[{start} --> {end}]")
+        file_path = os.path.join(verbose_callback_folder_save, 'transcription.txt')  # Usando directory en lugar de save_directory
+        with open(file_path, 'a', encoding='utf-8') as file:
+            file.write(f"{start} --> {end}\n")
+            file.write(f"{text}\n\n")
+        self.update_transcription(f"{start} --> {end}\n{text}\n")
+    
+    def update_transcription(self, text):
+        print(text,'execute update_transcription')
+        # Programa la actualización en el hilo principal
+        self.after(0, lambda: self.transcription_text.insert('1.0', f"{text}\n"))
 
-from moviepy.editor import *
 
-def getVideoYT(url):
-    try:
-        yt = pt.YouTube(url)
-        clear_name = clearName(yt.title)
-        duration = yt.length
-        # video_time.set(f"Duración del video: {duration} segundos")
-        nameMp3 = nameToMp3(yt.title)
-        audio_route = f"{FOLDER_SOUNDS}{nameMp3}"
-        if os.path.exists(audio_route):
-            os.remove(audio_route)
-            
-        temp_file = f"{FOLDER_SOUNDS}{clear_name}.mp4"
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
-        # concat_current_line(root,current_line,f"Descargando video de youtube...")
-        t = yt.streams.filter(only_audio=True).order_by('abr').desc()
-        video_name = f"{clear_name}.mp4"
-        t[0].download(output_path=FOLDER_SOUNDS, filename=video_name)
-        # concat_current_line(root,current_line,f"Renombrando video a audio...")
+    def start_process_video_thread(self):
+        # Crea un hilo y comienza el procesamiento en ese hilo
+        process_thread = threading.Thread(target=self.process_video)
+        process_thread.start()
 
-        # Convertir el archivo a MP3
-        audio = AudioFileClip(temp_file)
-        audio.write_audiofile(audio_route)
+    def getVideoYT(self):
+        url = self.yt_url_var.get()
+        print('inner get video yt')
+        try:
+            yt = pt.YouTube(url)
+            clear_name = clearName(yt.title)
+            duration = yt.length
+            self.update_transcription(f"Duración del video: {duration} segundos")
+            # video_time.set(f"Duración del video: {duration} segundos")
+            nameMp3 = nameToMp3(yt.title)
+            audio_route = f"{FOLDER_SOUNDS}{nameMp3}"
+            if os.path.exists(audio_route):
+                os.remove(audio_route)
+                
+            temp_file = f"{FOLDER_SOUNDS}{clear_name}.mp4"
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+            # concat_current_line(root,current_line,f"Descargando video de youtube...")
+            t = yt.streams.filter(only_audio=True).order_by('abr').desc()
+            video_name = f"{clear_name}.mp4"
+            self.update_transcription(f"Descargando video de youtube...")
+            t[0].download(output_path=FOLDER_SOUNDS, filename=video_name)
+            self.update_transcription(f"Renombrando video a audio...")
+            # concat_current_line(root,current_line,f"Renombrando video a audio...")
 
-        # Eliminar el archivo temporal
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
+            # Convertir el archivo a MP3
+            audio = AudioFileClip(temp_file)
+            audio.write_audiofile(audio_route)
 
-        # return route audio
-        return audio_route
+            # Eliminar el archivo temporal
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
 
-    except Exception as e:
-        messagebox.showerror("Error", f"Ocurrió un error: {str(e)}")
+            # return route audio
+            return audio_route
 
-def verbose_callback(language,start, end, result, text,verbose_callback_folder_save):
-    print(f"[{start} --> {end}]")
-    file_path = os.path.join(verbose_callback_folder_save, 'transcription.txt')  # Usando directory en lugar de save_directory
-    with open(file_path, 'a', encoding='utf-8') as file:
-        file.write(f"{start} --> {end}\n")
-        file.write(f"{text}\n\n")
+        except Exception as e:
+            messagebox.showerror("Error", f"Ocurrió un error: {str(e)}")
+
+
 
 if __name__ == "__main__":
     app = App()
